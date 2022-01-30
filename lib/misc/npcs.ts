@@ -44,7 +44,7 @@ export class NPCManager {
 }
 
 export class NPC {
-    props: {[key: number]: PropData} = {}
+    props: {[key: number]: PropData} = {};
 
     constructor(public readonly id: number) {
         this.props[NPCPropID.NPCPROP_ID] = id;

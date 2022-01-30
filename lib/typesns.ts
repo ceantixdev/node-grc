@@ -24,7 +24,7 @@ export type ServerlistConfig = {
 	account: string
 	password: string,
 	nickname: string
-}
+};
 
 export interface RCEvents {
 	onRCConnected?(instance: RCInterface): void

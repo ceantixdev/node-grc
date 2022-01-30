@@ -11,14 +11,14 @@ export interface RemoteControlEvents extends types.NCEvents, types.RCEvents {}
 
 export class RemoteControl implements types.RCInterface
 {
-	private readonly config: types.ServerlistConfig
+	private readonly config: types.ServerlistConfig;
 	public readonly server: types.ServerEntry;
 	private readonly eventHandler: RemoteControlEvents;
-	private readonly packetTable: PacketTable
+	private readonly packetTable: PacketTable;
 
-	private sock?: GSocket
-	private npcControl?: NPCControl
-	private disconnectMsg?: string
+	private sock?: GSocket;
+	private npcControl?: NPCControl;
+	private disconnectMsg?: string;
 
 	public get nc(): NPCControl | undefined {
 		return this.npcControl;
@@ -32,14 +32,15 @@ export class RemoteControl implements types.RCInterface
 		this.packetTable = this.initializeHandlers();
 		this.connect(server.ip, server.port);
 	}
-
+	
 	public isConnected(): boolean {
 		return !!this.sock;
 	}
 
 	public connect(host: string, port: number): boolean {
-		if (this.sock)
+		if (this.sock) {
 			return false;
+		}
 
 		this.sock = GSocket.connect(host, port, {
 			connectCallback: () => this.onConnect(),
@@ -211,7 +212,7 @@ export class RemoteControl implements types.RCInterface
 			const address = reader.readChars(reader.bytesLeft);
 
 			const split = address.split(",");
-			if (split.length == 2) {
+			if (split.length === 2) {
 				// TODO(joey): in a future date, connect to this ip, and if it fails to connect
 				// then use the server-ip's address as a backup to prevent breaking localhost servers
 				if (split[0] === "127.0.0.1") {

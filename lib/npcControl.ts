@@ -45,8 +45,9 @@ export class NPCControl implements NCInterface
 	}
 
 	public connect(host: string, port: number): boolean {
-		if (this.sock)
+		if (this.sock) {
 			return false;
+		}
 
 		this.sock = GSocket.connect(host, port, {
 			connectCallback: () => this.onConnect(),
@@ -188,7 +189,9 @@ export class NPCControl implements NCInterface
 		const packetTable = new PacketTable;
 
 		packetTable.setDefault((id: number, packet: Buffer): void => {
-			console.log(`[NC] Unhandled Packet (${id}): ${packet.toString().replace(/\r/g, "")}`);
+			if (id !== 42) {
+				console.log(`[NC] Unhandled Packet (${id}): ${packet.toString().replace(/\r/g, "")}`);
+			}
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NEWWORLDTIME, (id: number, packet: Buffer): void => {
