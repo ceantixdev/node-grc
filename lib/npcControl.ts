@@ -213,7 +213,8 @@ export class NPCControl implements NCInterface
 			// TODO: Use a queue to keep track of npc names, FIFO
 			//	OR pull the name from the "Variable dump from npc xyz"
 			const text = guntokenize(packet.toString());
-			this.eventHandler.onReceiveNpcAttributes?.("", text);
+			const name = text.substring("Variable dump from npc ".length + 1, text.indexOf('\n')).trimEnd();
+			this.eventHandler.onReceiveNpcAttributes?.(name, text);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_NPCADD, (id: number, packet: Buffer): void => {
