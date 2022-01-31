@@ -163,11 +163,23 @@ export class NPCControl implements NCInterface
 	}
 
 	setNpcFlags(name: string, script: string): void {
-		throw new Error("Method not implemented.");
+		const npcObject = this.npcMngr.findNPC(name);
+		if (npcObject) {
+			const nb = GBufferWriter.create(3);
+			nb.writeGUInt24(npcObject.id);
+			nb.writeChars(gtokenize(script));
+			this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_NPCFLAGSSET, nb.buffer));
+		}
 	}
 
 	setNpcScript(name: string, script: string): void {
-		throw new Error("Method not implemented.");
+		const npcObject = this.npcMngr.findNPC(name);
+		if (npcObject) {
+			const nb = GBufferWriter.create(3);
+			nb.writeGUInt24(npcObject.id);
+			nb.writeChars(gtokenize(script));
+			this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_NPCSCRIPTSET, nb.buffer));
+		}
 	}
 
 	deleteClass(name: string): void {
