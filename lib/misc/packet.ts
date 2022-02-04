@@ -39,6 +39,7 @@ export enum RCIncomingPacket {
 
 export enum RCOutgoingPacket {
 	PLI_PLAYERPROPS 			= 2,
+	PLI_RAWDATA					= 50,
 	PLI_RC_SERVEROPTIONSGET 	= 51,
 	PLI_RC_SERVEROPTIONSSET 	= 52,
 	PLI_RC_FOLDERCONFIGGET 		= 53,

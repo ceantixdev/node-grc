@@ -1,6 +1,6 @@
 import { FSEntryType } from ".";
 import { FolderRights } from "./common/FolderRights";
-import { GBufferReader } from "./common/GBuffer";
+import { GBufferReader, GBufferWriter } from "./common/GBuffer";
 import { PromiseManger } from "./common/PromiseManager";
 import { RCOutgoingPacket } from "./misc/packet";
 import { RemoteControl } from "./remoteControl";
@@ -136,8 +136,38 @@ export class RCFileBrowser implements FileBrowser {
 		return this.promiseMngr.createPromise("dir://" + folder);
 	}
 
-	put(file: string, content: Buffer): void {
-		throw new Error("Method not implemented.");
+	put(fileName: string, content: Buffer): void {
+		if (content.length > this.rc.maxUploadFileSize) {
+			throw new Error("File is too large!");
+		}
+		
+		const largeFileThreshold = 32000;
+		const isLargeFile = content.length > largeFileThreshold;
+
+		if (isLargeFile) {
+			this.rc.socket?.sendData(this.rc.socket?.sendPacket(RCOutgoingPacket.PLI_RC_LARGEFILESTART, Buffer.from(fileName)));
+		}
+
+		const reader = GBufferReader.from(content);
+		while (reader.bytesLeft) {
+			const cur = reader.read(largeFileThreshold);
+			const dataSize = 3 + fileName.length + cur.length; // char(PLI_RC_FILEBROWSER_UP) + len(file) + file + cur + '\n'
+			const writer = GBufferWriter.create(4 + dataSize); // len(data) + '\n'
+
+			writer.writeGUInt24(dataSize);
+			writer.writeUInt8(0xa);
+
+			writer.writeGUInt8(RCOutgoingPacket.PLI_RC_FILEBROWSER_UP);
+			writer.writeGString(fileName);
+			writer.writeBuffer(cur);
+			writer.writeUInt8(0xa);
+
+			this.rc.socket?.sendData(this.rc.socket?.sendPacket(RCOutgoingPacket.PLI_RAWDATA, writer.buffer));
+		}
+
+		if (isLargeFile) {
+			this.rc.socket?.sendData(this.rc.socket?.sendPacket(RCOutgoingPacket.PLI_RC_LARGEFILEEND, Buffer.from(fileName)));
+		}
 	}
 	
 	get(fileName: string) : PromiseLike<Buffer> {

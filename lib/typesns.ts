@@ -36,6 +36,8 @@ export interface RCEvents {
 }
 
 export interface RCInterface {
+	get maxUploadFileSize(): number
+
 	sendRCChat(text: string): void
 	setNickName(name: string): void
 

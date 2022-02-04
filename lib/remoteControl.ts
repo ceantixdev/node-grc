@@ -33,6 +33,7 @@ export class RemoteControl implements types.RCInterface {
 	private sock?: GSocket;
 	private npcControl?: NPCControl;
 	private disconnectMsg?: string;
+	private maxUploadSize = 0;
 
 	public get socket(): GSocket | undefined {
 		return this.sock;
@@ -44,6 +45,10 @@ export class RemoteControl implements types.RCInterface {
 
 	public get NpcControl(): types.NCInterface | undefined {
 		return this.npcControl;
+	}
+
+	public get maxUploadFileSize(): number {
+		return this.maxUploadSize;
 	}
 
 	constructor(config: types.ServerlistConfig, server: types.ServerEntry, eventHandler: RemoteControlEvents) {
@@ -118,18 +123,6 @@ export class RemoteControl implements types.RCInterface {
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_NPCSERVERQUERY, writer.buffer));
 
 		this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_START));
-
-		// const d = this.changeDirectory("world/");
-		// d.then((v) => {
-		// 	console.log("Received directory listing: ", v);
-		// 	this.fileBrowser.get("pics1.png").then((v) => {
-		// 		fs.writeFileSync("/Users/joey/pics1.png", v);
-		// 	});
-		// });
-
-		// const writer2 = GBufferWriter.create();
-		// writer2.writeChars("world/");
-		// this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_CD, writer2.buffer));
 	}
 
 	private connectToNpcServer(host: string, port: number): NPCControl | null {
@@ -270,8 +263,7 @@ export class RemoteControl implements types.RCInterface {
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_RC_MAXUPLOADFILESIZE, (id: number, packet: Buffer): void => {
-			const maxUploadSize = GBufferReader.from(packet).readGULong();
-			console.log(`Upload Size: ${maxUploadSize} Mebibytes`);
+			this.maxUploadSize = GBufferReader.from(packet).readGULong();
 		});
 
 		// User folder rights
