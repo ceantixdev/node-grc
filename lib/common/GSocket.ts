@@ -108,7 +108,7 @@ export class GSocket
 
     public sendPacket(id: number, buf?: Buffer)
     {
-        let buffers = [ Buffer.from([id + 32]) ];
+        const buffers = [ Buffer.from([id + 32]) ];
 
         if (buf)
             buffers.push(buf);
@@ -156,6 +156,7 @@ export class GSocket
             if (this.rawBytesAhead > 0) {
                 // Reset raw
                 this.rawBytesAhead = 0;
+                offset = idx;
             } else {
                 // Skip passed the newline
                 offset = idx + 1;

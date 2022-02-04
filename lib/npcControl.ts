@@ -2,10 +2,23 @@ import { GBufferReader, GBufferWriter } from "./common/GBuffer";
 import { ProtocolGen } from "./common/GProtocol";
 import { GSocket } from "./common/GSocket";
 import { PacketTable } from "./common/PacketTable";
+import { PromiseManger } from "./common/PromiseManager";
 import { gtokenize, guntokenize } from "./common/utils";
 import { NPC, NPCManager, NPCPropID } from "./misc/npcs";
 import { NCIncomingPacket, NCOutgoingPacket } from "./misc/packet";
 import { NCEvents, NCInterface, ServerlistConfig } from "./typesns";
+
+enum UriConstants {
+	NpcPrefix = "npcserver://npcs/",
+	ScriptPrefix = "npcserver://scripts/",
+	WeaponPrefix = "npcserver://weapons/",
+	WeaponList = "npcserver://weapons",
+	LevelList = "npcserver://levellist"
+}
+
+enum ErrorMsg {
+	NotFound = "Resource not found"
+}
 
 interface NpcControlConfig {
 	host: string
@@ -18,9 +31,9 @@ export class NPCControl implements NCInterface
 	private readonly packetTable: PacketTable;
 	private readonly eventHandler: NCEvents;
 
+	private promiseMngr: PromiseManger = new PromiseManger();
 	private npcMngr: NPCManager = new NPCManager();
 	private classList: Set<string> = new Set<string>();
-	private weaponList: Set<string> = new Set<string>();
 	
 	public get classes(): Set<string> {
 		return this.classList;
@@ -28,14 +41,6 @@ export class NPCControl implements NCInterface
 
 	public get npcs(): NPC[] {
 		return this.npcMngr.npcs;
-	}
-
-	public get testnpcmngr(): NPCManager {
-		return this.npcMngr;
-	}
-	
-	public get weapons(): Set<string> {
-		return this.weaponList;
 	}
 
 	constructor(private readonly config: ServerlistConfig, ncConfig: NpcControlConfig, eventHandler: NCEvents) {
@@ -60,14 +65,6 @@ export class NPCControl implements NCInterface
 
 	public disconnect(): void {
 		this.sock?.disconnect();
-	}
-	
-	public requestLevelList(): void {
-		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_LEVELLISTGET));
-	}
-
-	public updateLevelList(text: string): void {
-
 	}
 
 	////////////////////
@@ -107,16 +104,23 @@ export class NPCControl implements NCInterface
 
 	////////////////////
 
+	requestLevelList(): Promise<string> {
+		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_LEVELLISTGET));
+		return this.promiseMngr.createPromise(UriConstants.LevelList);
+	}
+
 	deleteWeapon(name: string): void {
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_WEAPONDELETE, Buffer.from(name)));
 	}
 
-	requestWeaponList(): void {
+	requestWeaponList(): Promise<Set<string>> {
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_WEAPONLISTGET));
+		return this.promiseMngr.createPromise(UriConstants.WeaponList);
 	}
 
-	requestWeapon(name: string): void {
+	requestWeapon(name: string): Promise<[string, string]> {
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_WEAPONGET, Buffer.from(name)));
+		return this.promiseMngr.createPromise(UriConstants.WeaponPrefix + name);
 	}
 
 	setWeaponScript(name: string, image: string, script: string): void {
@@ -135,31 +139,40 @@ export class NPCControl implements NCInterface
 		throw new Error("Method not implemented.");
 	}
 
-	requestNpcAttributes(name: string): void {
+	requestNpcAttributes(name: string): Promise<string> {
 		const npcObject = this.npcMngr.findNPC(name);
 		if (npcObject) {
 			const nb = GBufferWriter.create(3);
 			nb.writeGUInt24(npcObject.id);
 			this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_NPCGET, nb.buffer));
+			return this.promiseMngr.createPromise(UriConstants.NpcPrefix + name + ".attrs");
 		}
+
+		return Promise.reject(ErrorMsg.NotFound);
 	}
 
-	requestNpcFlags(name: string): void {
+	requestNpcFlags(name: string): Promise<string> {
 		const npcObject = this.npcMngr.findNPC(name);
 		if (npcObject) {
 			const nb = GBufferWriter.create(3);
 			nb.writeGUInt24(npcObject.id);
 			this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_NPCFLAGSGET, nb.buffer));
+			return this.promiseMngr.createPromise(UriConstants.NpcPrefix + name + ".flags");
 		}
+
+		return Promise.reject(ErrorMsg.NotFound);
 	}
 
-	requestNpcScript(name: string): void {
+	requestNpcScript(name: string): Promise<string> {
 		const npcObject = this.npcMngr.findNPC(name);
 		if (npcObject) {
 			const nb = GBufferWriter.create(3);
 			nb.writeGUInt24(npcObject.id);
 			this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_NPCSCRIPTGET, nb.buffer));
+			return this.promiseMngr.createPromise(UriConstants.NpcPrefix + name + ".script");
 		}
+
+		return Promise.reject(ErrorMsg.NotFound);
 	}
 
 	setNpcFlags(name: string, script: string): void {
@@ -186,8 +199,9 @@ export class NPCControl implements NCInterface
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_CLASSDELETE, Buffer.from(name)));
 	}
 
-	requestClass(name: string): void {
+	requestClass(name: string): Promise<string> {
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_CLASSEDIT, Buffer.from(name)));
+		return this.promiseMngr.createPromise(UriConstants.ScriptPrefix + name);
 	}
 
 	setClassScript(name: string, script: string): void {
@@ -218,15 +232,14 @@ export class NPCControl implements NCInterface
 
 		packetTable.on(NCIncomingPacket.PLO_NC_LEVELLIST, (id: number, packet: Buffer): void => {
 			const levelList = guntokenize(packet.toString());
-			this.eventHandler.onReceiveLevelList?.(levelList);
+			this.promiseMngr.resolvePromise(UriConstants.LevelList, levelList);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_NPCATTRIBUTES, (id: number, packet: Buffer): void => {
-			// TODO: Use a queue to keep track of npc names, FIFO
-			//	OR pull the name from the "Variable dump from npc xyz"
 			const text = guntokenize(packet.toString());
 			const name = text.substring("Variable dump from npc ".length + 1, text.indexOf('\n')).trimEnd();
-			this.eventHandler.onReceiveNpcAttributes?.(name, text);
+
+			this.promiseMngr.resolvePromise(UriConstants.NpcPrefix + name + ".attrs", text);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_NPCADD, (id: number, packet: Buffer): void => {
@@ -236,10 +249,8 @@ export class NPCControl implements NCInterface
 			const npcObj = this.npcMngr.getNpc(npcId);
 			npcObj.setProps(reader);
 
-			// @ts-ignore
-			this.requestNpcAttributes(npcObj.props[NPCPropID.NPCPROP_NAME]);
-
-			console.log(`NPC Added: ${npcObj.props[NPCPropID.NPCPROP_NAME]}`);
+			this.eventHandler.onNpcAdded?.(npcObj.props[NPCPropID.NPCPROP_NAME] as string);
+			// console.log(`NPC Added: ${npcObj.props[NPCPropID.NPCPROP_NAME]}`);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_NPCDELETE, (id: number, packet: Buffer): void => {
@@ -249,10 +260,11 @@ export class NPCControl implements NCInterface
 			// this.npcMngr.deleteNpc(npcId);
 
 			const npcObj = this.npcMngr.getNpc(npcId);
-			const npcName = npcObj.props[NPCPropID.NPCPROP_NAME];
+			const npcName = npcObj.props[NPCPropID.NPCPROP_NAME] as string;
 
 			if (this.npcMngr.deleteNpc(npcId)) {
-				console.log(`Delete npc ${npcObj.props[NPCPropID.NPCPROP_NAME]}`);
+				this.eventHandler.onNpcDeleted?.(npcName);
+				console.log(`Delete npc ${npcName}`);
 			}
 		});
 		
@@ -262,9 +274,10 @@ export class NPCControl implements NCInterface
 			const text = guntokenize(reader.readChars(reader.bytesLeft));
 
 			const npcObj = this.npcMngr.getNpc(npcId);
-
-			// @ts-ignore
-			this.eventHandler.onReceiveNpcScript?.(npcObj.props[NPCPropID.NPCPROP_NAME], text);
+			if (npcObj) {
+				const npcName = npcObj.props[NPCPropID.NPCPROP_NAME] as string;
+				this.promiseMngr.resolvePromise(UriConstants.NpcPrefix + npcName + ".script", text);
+			}
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_NPCFLAGS, (id: number, packet: Buffer): void => {
@@ -273,9 +286,10 @@ export class NPCControl implements NCInterface
 			const text = guntokenize(reader.readChars(reader.bytesLeft));
 
 			const npcObj = this.npcMngr.getNpc(npcId);
-
-			// @ts-ignore
-			this.eventHandler.onReceiveNpcFlags?.(npcObj.props[NPCPropID.NPCPROP_NAME], text);
+			if (npcObj) {
+				const npcName = npcObj.props[NPCPropID.NPCPROP_NAME] as string;
+				this.promiseMngr.resolvePromise(UriConstants.NpcPrefix + npcName + ".flags", text);
+			}
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_CLASSGET, (id: number, packet: Buffer): void => {
@@ -283,7 +297,7 @@ export class NPCControl implements NCInterface
 			const name = reader.readGString();
 			const script = guntokenize(reader.readChars(reader.bytesLeft));
 
-			this.eventHandler.onReceiveClassScript?.(name, script);
+			this.promiseMngr.resolvePromise(UriConstants.ScriptPrefix + name, script);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_CLASSADD, (id: number, packet: Buffer): void => {
@@ -304,18 +318,18 @@ export class NPCControl implements NCInterface
 			let script = reader.readChars(reader.bytesLeft);
 			script = script.replace(/\xa7/g, '\n');
 
-			this.eventHandler.onReceiveWeaponScript?.(name, image, script);
+			this.promiseMngr.resolvePromise<[string, string]>(UriConstants.WeaponPrefix + name, [image, script]);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_WEAPONLISTGET, (id: number, packet: Buffer): void => {
-			this.weaponList.clear();
+			const weaponList: Set<string> = new Set;
 
 			const reader = GBufferReader.from(packet);
 			while (reader.bytesLeft) {
-				this.weaponList.add(reader.readGString());
+				weaponList.add(reader.readGString());
 			}
-			
-			this.eventHandler.onReceiveWeaponList?.([...this.weaponList]);
+
+			this.promiseMngr.resolvePromise(UriConstants.WeaponList, weaponList);
 		});
 
 		return packetTable;

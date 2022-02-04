@@ -4,8 +4,6 @@ import { GSocket } from "./common/GSocket";
 import { PacketTable } from "./common/PacketTable";
 import { ServerCategory, ServerEntry, ServerlistConfig } from "./typesns";
 
-export type ServerlistCallback = (servers: ServerEntry[]) => void;
-
 function determineServerType(serverName: string): [string, ServerCategory] {
 	switch (serverName.substring(0, 2)) {
 		case "H ":
@@ -26,7 +24,7 @@ function determineServerType(serverName: string): [string, ServerCategory] {
 
 export class Serverlist
 {
-	private config: ServerlistConfig = {
+	private readonly config: ServerlistConfig = {
 		host: "listserver.graal.in",
 		port: 14922,
 		account: "",

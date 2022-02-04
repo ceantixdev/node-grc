@@ -1,3 +1,5 @@
+import { NPC } from "./misc/npcs";
+
 export enum ServerCategory {
 	classic = 0,
 	gold = 1,
@@ -18,31 +20,27 @@ export interface ServerEntry {
 	port: number
 }
 
-export type ServerlistConfig = {
+export interface ServerlistConfig {
 	host: string
 	port: number
 	account: string
-	password: string,
+	password: string
 	nickname: string
-};
+}
 
 export interface RCEvents {
 	onRCConnected?(instance: RCInterface): void
 	onRCDisconnected?(instance: RCInterface, text?: string): void
 	onRCChat?(text: string): void
-
-	onReceiveFolderConfig?(text: string): void
-	onReceiveServerFlags?(text: string): void
-	onReceiveServerOptions?(text: string): void
 }
 
 export interface RCInterface {
 	sendRCChat(text: string): void
 	setNickName(name: string): void
 
-	requestFolderConfig(): void
-	requestServerFlags(): void
-	requestServerOptions(): void
+	requestFolderConfig(): Promise<string>
+	requestServerFlags(): Promise<string>
+	requestServerOptions(): Promise<string>
 
 	setFolderConfig(text: string): void
 	setServerFlags(text: string): void
@@ -55,35 +53,47 @@ export interface NCEvents {
 	onNCDisconnected?(text?: string): void
 	onNCChat?(text: string): void
 
-	onReceiveLevelList?(levelList: string): void
-
-	onReceiveClassScript?(name: string, script: string): void
-
-	onReceiveNpcAttributes?(name: string, text: string): void;
-	onReceiveNpcFlags?(name: string, flags: string): void
-	onReceiveNpcScript?(name: string, script: string): void
-
-	onReceiveWeaponList?(weapons: string[]): void
-	onReceiveWeaponScript?(name: string, image: string, script: string): void
+	onNpcAdded?(name: string): void
+	onNpcDeleted?(name: string): void
 }
 
 export interface NCInterface {
-	requestLevelList(): void
-	updateLevelList(text: string): void
+	get classes(): Set<string>;
+	get npcs(): NPC[]
+
+	requestLevelList(): Promise<string>
 
 	deleteWeapon(name: string): void
-	requestWeaponList(): void
-	requestWeapon(name: string): void
+	requestWeaponList(): Promise<Set<string>>
+	requestWeapon(name: string): Promise<[string, string]>
 	setWeaponScript(name: string, image: string, script: string): void
 
 	deleteNpc(name: string): void
-	requestNpcAttributes(name: string): void
-	requestNpcFlags(name: string): void
-	requestNpcScript(name: string): void
+	requestNpcAttributes(name: string): Promise<string>
+	requestNpcFlags(name: string): Promise<string>
+	requestNpcScript(name: string): Promise<string>
 	setNpcFlags(name: string, script: string): void
 	setNpcScript(name: string, script: string): void
 
 	deleteClass(name: string): void
-	requestClass(name: string): void
+	requestClass(name: string): Promise<string>
 	setClassScript(name: string, script: string): void
 }
+
+export enum FSEntryType {
+	File,
+	Directory
+}
+
+export interface FSEntries {
+	name: string,
+	type: FSEntryType,
+	permissions: string,
+	fileSize: number,
+	modTime: number
+}
+
+export type DirectoryListing = {
+	directory: string,
+	fileList: FSEntries[]
+};

@@ -1,3 +1,7 @@
+export function escapeRegExp(s: string) {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function graal_tokenize(string: string, sep = ' ') {
 	let separator = sep[0];
 	let insideQuote = false;

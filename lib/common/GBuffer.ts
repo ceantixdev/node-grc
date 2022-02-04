@@ -111,6 +111,14 @@ export class GBufferReader
         return this.read(len).toString("latin1");
     }
 
+    public readGBuffer(len?: number): GBufferReader {
+        if (!len) {
+            len = this.readGUInt8();
+        }
+        
+        return new GBufferReader(this.read(len));
+    }
+
     public readGString(): string {
         return this.readChars(this.readGUInt8());
     }

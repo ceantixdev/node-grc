@@ -1,26 +1,48 @@
-import {GProtocol, ProtocolGen} from "./common/GProtocol";
-import {GSocket} from "./common/GSocket";
-import {PacketTable} from "./common/PacketTable";
-import {GBufferReader, GBufferWriter} from "./common/GBuffer";
-import {gtokenize, guntokenize} from "./common/utils";
-import {NPCControl} from "./npcControl";
+import { GProtocol, ProtocolGen } from "./common/GProtocol";
+import { GSocket } from "./common/GSocket";
+import { PacketTable } from "./common/PacketTable";
+import { GBufferReader, GBufferWriter } from "./common/GBuffer";
+import { gtokenize, guntokenize } from "./common/utils";
+import { NPCControl } from "./npcControl";
 import * as types from "./typesns";
-import {PlayerProperties, RCIncomingPacket, RCOutgoingPacket} from "./misc/packet";
+import { PlayerProperties, RCIncomingPacket, RCOutgoingPacket } from "./misc/packet";
+import { PromiseManger } from "./common/PromiseManager";
+import { FileBrowser, RCFileBrowser } from "./fileBrowser";
 
-export interface RemoteControlEvents extends types.NCEvents, types.RCEvents {}
+enum UriConstants {
+	FolderConfig = "gserver://config/folderconfig",
+	ServerFlags = "gserver://config/serverflags",
+	ServerOptions = "gserver://config/serveroptions"
+}
 
-export class RemoteControl implements types.RCInterface
-{
+interface RCInternal {
+	socket(): GSocket | undefined
+	promiseManager(): PromiseManger
+}
+
+export interface RemoteControlEvents extends types.NCEvents, types.RCEvents { }
+
+export class RemoteControl implements types.RCInterface {
 	private readonly config: types.ServerlistConfig;
 	public readonly server: types.ServerEntry;
 	private readonly eventHandler: RemoteControlEvents;
 	private readonly packetTable: PacketTable;
+	private readonly fileBrowser: RCFileBrowser;
+	private readonly promiseMngr: PromiseManger = new PromiseManger();
 
 	private sock?: GSocket;
 	private npcControl?: NPCControl;
 	private disconnectMsg?: string;
 
-	public get nc(): NPCControl | undefined {
+	public get socket(): GSocket | undefined {
+		return this.sock;
+	}
+
+	public get FileBrowser(): FileBrowser {
+		return this.fileBrowser;
+	}
+
+	public get NpcControl(): types.NCInterface | undefined {
 		return this.npcControl;
 	}
 
@@ -28,11 +50,12 @@ export class RemoteControl implements types.RCInterface
 		this.config = config;
 		this.server = server;
 		this.eventHandler = eventHandler;
+		this.fileBrowser = new RCFileBrowser(this);
 
 		this.packetTable = this.initializeHandlers();
 		this.connect(server.ip, server.port);
 	}
-	
+
 	public isConnected(): boolean {
 		return !!this.sock;
 	}
@@ -93,10 +116,23 @@ export class RemoteControl implements types.RCInterface
 		writer.writeGUInt16(2); // npc-server id
 		writer.writeChars("location");
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_NPCSERVERQUERY, writer.buffer));
+
+		this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_START));
+
+		// const d = this.changeDirectory("world/");
+		// d.then((v) => {
+		// 	console.log("Received directory listing: ", v);
+		// 	this.fileBrowser.get("pics1.png").then((v) => {
+		// 		fs.writeFileSync("/Users/joey/pics1.png", v);
+		// 	});
+		// });
+
+		// const writer2 = GBufferWriter.create();
+		// writer2.writeChars("world/");
+		// this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_CD, writer2.buffer));
 	}
 
-	private connectToNpcServer(host: string, port: number): NPCControl|null
-	{
+	private connectToNpcServer(host: string, port: number): NPCControl | null {
 		if (this.npcControl) {
 			this.npcControl.disconnect();
 			this.npcControl = undefined;
@@ -111,16 +147,19 @@ export class RemoteControl implements types.RCInterface
 
 	////////////////////
 
-	requestFolderConfig(): void {
+	requestFolderConfig(): Promise<string> {
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_RC_FOLDERCONFIGGET));
+		return this.promiseMngr.createPromise(UriConstants.FolderConfig);
 	}
 
-	requestServerFlags(): void {
+	requestServerFlags(): Promise<string> {
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_RC_SERVERFLAGSGET));
+		return this.promiseMngr.createPromise(UriConstants.ServerFlags);
 	}
 
-	requestServerOptions(): void {
+	requestServerOptions(): Promise<string> {
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_RC_SERVEROPTIONSGET));
+		return this.promiseMngr.createPromise(UriConstants.ServerOptions);
 	}
 
 	setFolderConfig(text: string): void {
@@ -193,17 +232,17 @@ export class RemoteControl implements types.RCInterface
 				text += reader.readGString() + "\n";
 			}
 
-			this.eventHandler.onReceiveServerFlags?.(text);
+			this.promiseMngr.resolvePromise(UriConstants.ServerFlags, text);
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_RC_SERVEROPTIONSGET, (id: number, packet: Buffer): void => {
 			const text = guntokenize(packet.toString());
-			this.eventHandler.onReceiveServerOptions?.(text);
+			this.promiseMngr.resolvePromise(UriConstants.ServerOptions, text);
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_RC_FOLDERCONFIGGET, (id: number, packet: Buffer): void => {
 			const text = guntokenize(packet.toString());
-			this.eventHandler.onReceiveFolderConfig?.(text);
+			this.promiseMngr.resolvePromise(UriConstants.FolderConfig, text);
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_NPCSERVERADDR, (id: number, packet: Buffer): void => {
@@ -233,6 +272,56 @@ export class RemoteControl implements types.RCInterface
 		packetTable.on(RCIncomingPacket.PLO_RC_MAXUPLOADFILESIZE, (id: number, packet: Buffer): void => {
 			const maxUploadSize = GBufferReader.from(packet).readGULong();
 			console.log(`Upload Size: ${maxUploadSize} Mebibytes`);
+		});
+
+		// User folder rights
+		packetTable.on(RCIncomingPacket.PLO_RC_FILEBROWSER_DIRLIST, (id: number, packet: Buffer): void => {
+			const text = guntokenize(packet.toString());
+			this.fileBrowser.setFolderRights(text);
+		});
+
+		// Directory listing
+		packetTable.on(RCIncomingPacket.PLO_RC_FILEBROWSER_DIR, (id: number, packet: Buffer): void => {
+			const reader = GBufferReader.from(packet);
+			const folderName = reader.readGString();
+			this.fileBrowser.setFolderFiles(reader, folderName);
+		});
+
+		// Filebrowser messages
+		packetTable.on(RCIncomingPacket.PLO_RC_FILEBROWSER_MESSAGE, (id: number, packet: Buffer): void => {
+			console.log("[RC] PLO_RC_FILEBROWSER_MESSAGE:", GBufferReader.from(packet).readChars(packet.length));
+		});
+
+		packetTable.on(RCIncomingPacket.PLO_LARGEFILESTART, (id: number, packet: Buffer): void => {
+			const fileName = packet.toString();
+			this.fileBrowser.startLargeFile(fileName);
+		});
+
+		packetTable.on(RCIncomingPacket.PLO_LARGEFILESIZE, (id: number, packet: Buffer): void => {
+			const fileSize = GBufferReader.from(packet).readGULong();
+			this.fileBrowser.setActiveFileSize(fileSize);
+		});
+
+		packetTable.on(RCIncomingPacket.PLO_LARGEFILEEND, (id: number, packet: Buffer): void => {
+			const fileName = packet.toString();
+			this.fileBrowser.finishLargeFile(fileName);
+		});
+
+		packetTable.on(RCIncomingPacket.PLO_FILE, (id: number, packet: Buffer): void => {
+			const reader = GBufferReader.from(packet);
+
+			const modTime = reader.readGULong();
+			const fileName = reader.readGString();
+			const fileData = reader.read(reader.bytesLeft - 1); // removing '\n' character
+
+			this.fileBrowser.appendFileContent(fileName, modTime, fileData);
+
+			console.log(`Partial file data received for ${fileName} -> ${fileData.length} bytes --- `, modTime, fileData.slice(fileData.length - 5));
+		});
+
+		packetTable.on(RCIncomingPacket.PLO_FILESENDFAILED, (id: number, packet: Buffer): void => {
+			const fileName = packet.toString();
+			this.fileBrowser.fileDownloadFailed(fileName);
 		});
 
 		return packetTable;
