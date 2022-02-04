@@ -289,7 +289,10 @@ export class RemoteControl implements types.RCInterface {
 
 		// Filebrowser messages
 		packetTable.on(RCIncomingPacket.PLO_RC_FILEBROWSER_MESSAGE, (id: number, packet: Buffer): void => {
-			console.log("[RC] PLO_RC_FILEBROWSER_MESSAGE:", GBufferReader.from(packet).readChars(packet.length));
+			const msg = packet.toString();
+			this.eventHandler.onFileBrowserMsg?.(msg);
+
+			console.log("[RC] PLO_RC_FILEBROWSER_MESSAGE:", msg);
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_LARGEFILESTART, (id: number, packet: Buffer): void => {

@@ -32,6 +32,7 @@ export interface RCEvents {
 	onRCConnected?(instance: RCInterface): void
 	onRCDisconnected?(instance: RCInterface, text?: string): void
 	onRCChat?(text: string): void
+	onFileBrowserMsg?(text: string): void
 }
 
 export interface RCInterface {
