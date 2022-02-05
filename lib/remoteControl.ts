@@ -283,8 +283,6 @@ export class RemoteControl implements types.RCInterface {
 		packetTable.on(RCIncomingPacket.PLO_RC_FILEBROWSER_MESSAGE, (id: number, packet: Buffer): void => {
 			const msg = packet.toString();
 			this.eventHandler.onFileBrowserMsg?.(msg);
-
-			console.log("[RC] PLO_RC_FILEBROWSER_MESSAGE:", msg);
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_LARGEFILESTART, (id: number, packet: Buffer): void => {
@@ -310,8 +308,6 @@ export class RemoteControl implements types.RCInterface {
 			const fileData = reader.read(reader.bytesLeft - 1); // removing '\n' character
 
 			this.fileBrowser.appendFileContent(fileName, modTime, fileData);
-
-			console.log(`Partial file data received for ${fileName} -> ${fileData.length} bytes --- `, modTime, fileData.slice(fileData.length - 5));
 		});
 
 		packetTable.on(RCIncomingPacket.PLO_FILESENDFAILED, (id: number, packet: Buffer): void => {

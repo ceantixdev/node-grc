@@ -5,59 +5,53 @@ import { PacketHandler, PacketTable } from './PacketTable';
 export type ConnectHandler = () => void;
 export type DisconnectHandler = (err?: Error) => void;
 
-export interface SocketConfigurartion
-{
+export interface SocketConfigurartion {
     connectCallback?: ConnectHandler
     disconnectCallback?: DisconnectHandler
     packetTable?: PacketTable
 }
 
-export class GSocket
-{
+export class GSocket {
     private buffer: Buffer;
-    private enc: GProtocol|null = null;
-    private sock: net.Socket|null = null;
-    private packetHandler: PacketTable
-    private config: SocketConfigurartion
-    
+    private enc: GProtocol | null = null;
+    private sock: net.Socket | null = null;
+    private packetHandler: PacketTable;
+    private config: SocketConfigurartion;
+
     public rawBytesAhead: number = 0;
 
-    protected constructor(cfg: SocketConfigurartion)
-    {
+    protected constructor(cfg: SocketConfigurartion) {
         this.buffer = Buffer.allocUnsafe(0);
         this.config = cfg;
         this.packetHandler = cfg?.packetTable || new PacketTable;
     }
-    
-    public static connect(host: string, port: number, cfg?: SocketConfigurartion): GSocket
-    {
+
+    public static connect(host: string, port: number, cfg?: SocketConfigurartion): GSocket {
         const newSock = new GSocket(cfg || {});
         newSock.setProtocol(ProtocolGen.Gen2);
         newSock.connect(host, port);
         return newSock;
     }
-    
+
     // Expose PacketHandler methods
     public on(id: number, callback: PacketHandler) {
         return this.packetHandler.on(id, callback);
     }
 
-    private connect(host: string, port: number)
-    {
+    private connect(host: string, port: number) {
         this.sock = new net.Socket();
         this.sock.setTimeout(10000);
 
         this.sock.connect(port, host, this.config.connectCallback);
-        
-        this.sock.on("data", (data: Buffer) => {            
+
+        this.sock.on("data", (data: Buffer) => {
             this.buffer = Buffer.concat([this.buffer, data]);
 
-            while (this.buffer.length > 0)
-            {
+            while (this.buffer.length > 0) {
                 const readLen = this.buffer.readUInt16BE();
                 if (this.buffer.length < readLen + 2)
                     break;
-                
+
                 this.processData(this.buffer.slice(2, 2 + readLen));
                 this.buffer = this.buffer.slice(2 + readLen);
             }
@@ -80,35 +74,30 @@ export class GSocket
         });
     }
 
-    public disconnect()
-    {
-        if (this.sock)
-        {
+    public disconnect() {
+        if (this.sock) {
             this.sock.destroy();
             this.sock = null;
         }
     }
 
-    public setProtocol(protocol: ProtocolGen, key?: number)
-    {
+    public setProtocol(protocol: ProtocolGen, key?: number) {
         this.enc = GProtocol.initialize(protocol, key);
     }
 
-    public sendData(buf: Buffer)
-    {
+    public sendData(buf: Buffer) {
         if (this.enc)
             buf = this.enc.encrypt(buf);
 
         let nb = Buffer.allocUnsafe(buf.length + 2);
         buf.copy(nb, 2);
         nb.writeUInt16BE(buf.length, 0);
-        
+
         this.sock?.write(nb);
     }
 
-    public sendPacket(id: number, buf?: Buffer)
-    {
-        const buffers = [ Buffer.from([id + 32]) ];
+    public sendPacket(id: number, buf?: Buffer) {
+        const buffers = [Buffer.from([id + 32])];
 
         if (buf)
             buffers.push(buf);
@@ -120,35 +109,29 @@ export class GSocket
         return Buffer.concat(buffers);
     }
 
-    private processData(buf: Buffer)
-    {
+    private processData(buf: Buffer) {
         if (this.enc)
             buf = this.enc.decrypt(buf);
-        
+
         let offset = 0;
-        while (offset < buf.length)
-        {
+        while (offset < buf.length) {
             let idx;
-            
+
             // Read data from buffer, terminating at '\n' or rawBytesAhead if defined
             if (this.rawBytesAhead > 0) {
                 if (this.rawBytesAhead > buf.length - offset) {
-                    console.log(`Did we not read the entire raw buffer yet?? ${this.rawBytesAhead} < ${buf.length}`);
                     break;
                 }
 
                 idx = offset + this.rawBytesAhead;
             }
-            else
-            {
+            else {
                 idx = buf.indexOf('\n', offset);
-                if (idx === -1)
-                {
-                    console.log(`no token found from ${offset} of ${buf.length}`);
+                if (idx === -1) {
                     break;
                 }
             }
-            
+
             // Copy data into a new buffer
             let b = Buffer.allocUnsafe(idx - offset);
             buf.copy(b, 0, offset, idx);
@@ -168,11 +151,9 @@ export class GSocket
         }
     }
 
-    private processPacket(id: number, buf: Buffer)
-    {
+    private processPacket(id: number, buf: Buffer) {
         let handlers = this.packetHandler.getCallbacks(id);
-        for (let handle of handlers)
-        {
+        for (let handle of handlers) {
             handle(id, buf);
         }
     }

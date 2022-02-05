@@ -132,7 +132,6 @@ export class RCFileBrowser implements FileBrowser {
 		}
 
 		this.rc.socket?.sendData(this.rc.socket?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_CD, Buffer.from(folder)));
-		console.log("create promise: " + "dir://" + folder);
 		return this.promiseMngr.createPromise("dir://" + folder);
 	}
 
@@ -172,7 +171,6 @@ export class RCFileBrowser implements FileBrowser {
 	
 	get(fileName: string) : PromiseLike<Buffer> {
 		this.rc.socket?.sendData(this.rc.socket?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_DOWN, Buffer.from(fileName)));
-
 		return this.promiseMngr.createPromise(fileName);
 	}
 }
