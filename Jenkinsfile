@@ -100,7 +100,7 @@ def buildStepDocker() {
 			if (env.TAG_NAME) {
 				stage("Pushing npm package") {
 					customImage.inside("-u 0") {
-						withCredentials([string(credentialsId: 'PREAGONAL_NUGET_TOKEN', variable: 'NPM_CONFIG_TOKEN')]) {
+						withCredentials([string(credentialsId: 'PREAGONAL_NPM_TOKEN', variable: 'NPM_CONFIG_TOKEN')]) {
 							sh("npm publish --access public");
 							discordSend description: "NPM Successful", footer: "", link: env.BUILD_URL, result: currentBuild.currentResult, title: "[${split_job_name[0]}] Artifact Successful: ${fixed_job_name} #${env.BUILD_NUMBER}", webhookURL: env.GS2EMU_WEBHOOK;
 						}
