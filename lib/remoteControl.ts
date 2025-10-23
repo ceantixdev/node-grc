@@ -180,7 +180,8 @@ export class RemoteControl implements types.RCInterface {
 		writer.writeChars("location");
 		this.sock?.sendData(this.sock.sendPacket(RCOutgoingPacket.PLI_NPCSERVERQUERY, writer.buffer));
 
-		this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_START));
+		// Temp Disable to fix disconnect
+		//this.sock?.sendData(this.sock?.sendPacket(RCOutgoingPacket.PLI_RC_FILEBROWSER_START));
 	}
 
 	private connectToNpcServer(host: string, port: number): NPCControl | null {
