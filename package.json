@@ -1,5 +1,5 @@
 {
-  "name": "@ceantix/node-grc",
+  "name": "@ceantixdev/node-grc",
   "version": "1.2.0",
   "description": "",
   "main": "dist/index.js",
@@ -19,6 +19,10 @@
   },
   "dependencies": {
     "compressjs": "^1.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ceantixdev/node-grc.git"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
