@@ -1,3 +1,5 @@
+import { networkInterfaces } from 'os';
+import { hashCode } from "./common/utils";
 import { GProtocol, ProtocolGen } from "./common/GProtocol";
 import { GSocket } from "./common/GSocket";
 import { PacketTable } from "./common/PacketTable";
@@ -98,10 +100,66 @@ export class RemoteControl implements types.RCInterface {
 		writer.writeChars("GSERV025");
 		writer.writeGString(this.config.account);
 		writer.writeGString(this.config.password);
+		writer.writeChars("mac,");
 
+		// Special Thanks to Ruan for this portion of code
+		const getComputerCode = (computerHash: number) => {
+            const hexCode = [
+                '0',
+                '1',
+                '2',
+                '3',
+                '4',
+                '5',
+                '6',
+                '7',
+                '8',
+                '9',
+                'A',
+                'B',
+                'C',
+                'D',
+                'E',
+                'F',
+            ];
+
+            let stringBuilder = '';
+            for (let i = 0; i < 32; i++) {
+                stringBuilder += hexCode[Math.abs(computerHash % 16)];
+                computerHash *= 31;
+            }
+
+            return stringBuilder;
+        };
+
+        const getComputerHash = (): number => {
+            const nets = networkInterfaces();
+            const interfaces = Object.values(nets).flat().filter(Boolean);
+            const macAddress = interfaces.find(
+                (iface) => iface && iface.mac !== '00:00:00:00:00:00',
+            )?.mac;
+
+            return macAddress
+                ? hashCode(macAddress.split(':').join(''))
+                : Math.random() * 100000;
+        };
+
+        let computerCodeString;
+        const computerHash = getComputerHash();
+        computerCodeString = getComputerCode(
+            computerHash + hashCode(this.config.account),
+        );
+		
+		writer.writeChars(computerCodeString);
+		writer.writeChars(",");
+		writer.writeChars(computerCodeString);
+		writer.writeChars('""');
+		
+		
 		this.sock.sendData(this.sock.sendPacket(6, writer.buffer));
 		this.sock.setProtocol(ProtocolGen.Gen5, key);
 	}
+		
 
 	private onDisconnect(err?: Error): void {
 		this.sock = undefined;

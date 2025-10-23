@@ -157,6 +157,14 @@ export class GBufferWriter
         this.writePosition = 0;
     }
 
+    public writeEnd(): void {
+        if (this.length + 1 >= this.capacity)
+        this.resize();
+
+        this.internalBuffer.writeUInt8(0x0a, this.writePosition);
+        this.writePosition += 1;
+    }
+
     public resize(minimum?: number): boolean {
         minimum = minimum || this.internalBuffer.length;
         if (minimum < this.internalBuffer.length)
