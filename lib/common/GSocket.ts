@@ -97,11 +97,6 @@ export class GSocket {
     }
 
     public sendPacket(id: number, buf?: Buffer) {
-        // Ensure packet ends with the ending mark (newline, 0x0a)
-        /*if (!buf || buf.length === 0 || buf[buf.length - 1] !== 0x0a) {
-           buf = Buffer.concat([buf || Buffer.alloc(0), Buffer.from([0x0a])]);
-        }*/
-
         const buffers = [Buffer.from([id + 32])];
 
         if (buf)
