@@ -98,9 +98,9 @@ export class GSocket {
 
     public sendPacket(id: number, buf?: Buffer) {
         // Ensure packet ends with the ending mark (newline, 0x0a)
-        if (!buf || buf.length === 0 || buf[buf.length - 1] !== 0x0a) {
+        /*if (!buf || buf.length === 0 || buf[buf.length - 1] !== 0x0a) {
            buf = Buffer.concat([buf || Buffer.alloc(0), Buffer.from([0x0a])]);
-        }
+        }*/
 
         const buffers = [Buffer.from([id + 32])];
 
@@ -108,10 +108,21 @@ export class GSocket {
             buffers.push(buf);
 
         // Append new line to packets
-        if (!buf || buf[buf.length - 1] != 0xa)
-            buffers.push(Buffer.from([0xa]));
+        if (!buf || buf[buf.length - 1] != 0x0a)
+            buffers.push(Buffer.from([0x0a]));
 
-        return Buffer.concat(buffers);
+        
+        // Combine all parts into one packet
+        let packet = Buffer.concat(buffers);
+
+        // Ensure minimum packet length of 30 bytes
+        const MIN_LENGTH = 30;
+        if (packet.length < MIN_LENGTH) {
+            const padding = Buffer.alloc(MIN_LENGTH - packet.length, 0); // use 0x00 as filler
+            packet = Buffer.concat([packet, padding]);
+        }
+
+        return packet;
     }
 
     private processData(buf: Buffer) {
