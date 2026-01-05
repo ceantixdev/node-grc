@@ -195,8 +195,9 @@ export class NPCControl implements NCInterface
 		}
 	}
 
-	deleteClass(name: string): void {
+	deleteClass(name: string): Promise<void> {
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_CLASSDELETE, Buffer.from(name)));
+		return this.promiseMngr.createPromise("CLASS_DELETE_" + name);
 	}
 
 	requestClass(name: string): Promise<string> {
@@ -204,11 +205,12 @@ export class NPCControl implements NCInterface
 		return this.promiseMngr.createPromise(UriConstants.ScriptPrefix + name);
 	}
 
-	setClassScript(name: string, script: string): void {
+	setClassScript(name: string, script: string): Promise<void> {
 		const nb = GBufferWriter.create();
 		nb.writeGString(name);
 		nb.writeChars(gtokenize(script));
 		this.sock?.sendData(this.sock.sendPacket(NCOutgoingPacket.PLI_NC_CLASSADD, nb.buffer));
+		return this.promiseMngr.createPromise("CLASS_ADD_" + name);
 	}
 
 	private initializeHandlers(): PacketTable {
@@ -303,11 +305,13 @@ export class NPCControl implements NCInterface
 		packetTable.on(NCIncomingPacket.PLO_NC_CLASSADD, (id: number, packet: Buffer): void => {
 			const className = packet.toString();
 			this.classList.add(className);
+			this.promiseMngr.resolvePromise("CLASS_ADD_" + className, undefined);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_CLASSDELETE, (id: number, packet: Buffer): void => {
 			const className = packet.toString();
 			this.classList.delete(className);
+			this.promiseMngr.resolvePromise("CLASS_DELETE_" + className, undefined);
 		});
 
 		packetTable.on(NCIncomingPacket.PLO_NC_WEAPONGET, (id: number, packet: Buffer): void => {

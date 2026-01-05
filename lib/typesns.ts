@@ -78,9 +78,9 @@ export interface NCInterface {
 	setNpcFlags(name: string, script: string): void
 	setNpcScript(name: string, script: string): void
 
-	deleteClass(name: string): void
+	deleteClass(name: string): Promise<void>
 	requestClass(name: string): Promise<string>
-	setClassScript(name: string, script: string): void
+	setClassScript(name: string, script: string): Promise<void>
 }
 
 export enum FSEntryType {
