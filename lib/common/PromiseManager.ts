@@ -8,7 +8,7 @@ export interface PromiseData<T> {
 export class PromiseManger {
 	private promiseData: {[uri: string]: PromiseData<any>} = {};
 	
-	createPromise<Type>(uri: string, timeout: number = 10): Promise<Type> {
+	createPromise<Type>(uri: string, timeout: number =  300): Promise<Type> {
         return new Promise<Type>((resolve, reject) => {
             this.promiseData[uri] = {
                 resolve: resolve,
